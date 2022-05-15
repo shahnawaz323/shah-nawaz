@@ -1,0 +1,8 @@
+"0","# Create a histogram with the log transformed variable"
+"0","ggplot(new_who) +"
+"0","  geom_histogram(aes(log(cases))) + "
+"0","  geom_freqpoly(aes(log(cases)))"
+"2","`stat_bin()` using `bins = 30`. Pick better value with `binwidth`.
+"
+"2","`stat_bin()` using `bins = 30`. Pick better value with `binwidth`.
+"

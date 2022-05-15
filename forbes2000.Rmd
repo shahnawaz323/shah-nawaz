@@ -1,0 +1,360 @@
+---
+title: "MA334 Individual Project, Spring 2022"
+output: 
+  pdf_document:
+  fontsize: 11pt
+  geometry: margin=0.5in
+  pandoc_args: --listings
+  includes:
+      in_header: preamble.tex
+---
+
+```{r, include=FALSE}
+knitr::opts_chunk$set(
+  comment = "#>", out.width = "50%", out.height = "50%",fig.align="center"
+)
+
+```
+
+```{r message=FALSE, warning=FALSE, include=FALSE, paged.print=FALSE}
+# Importing libraries
+library(readr)
+library(tidyverse)
+library(dplyr)
+library(stats)
+library(broom)
+library(ggplot2)
+library(ggpubr)
+library(captioner)
+library(PerformanceAnalytics)
+library(ggstatsplot)
+library(knitr)
+```
+
+```{r include=FALSE}
+table_captions <- captioner::captioner(prefix="Tab.")
+figure_captions <- captioner::captioner(prefix="Fig.")
+
+t.ref <- function(label){
+  stringr::str_extract(table_captions(label), "[^:]*")
+}
+
+f.ref <- function(label){
+  stringr::str_extract(figure_captions(label), "[^:]*")
+}
+```
+
+## Introduction to dataset
+
+Forbes2000 is a list comprising of large companies working worldwide. The list is published on regular basis for the acknowledgement of the profitable companies with large number of employees. Other parameters considered for the completion of Forbes2000 selection are sales, assets and market value. All of these parameters are given as column names in the dataset used for analysis in next sections. Moreover the dataset also includes the company name, category of products provided and the countries they belong to originally. The example dataset we use here is given on [this](https://vincentarelbundock.github.io/Rdatasets/articles/data.html) link. We have selected this dataset since it includes a reasonable number of rows and columns for the statistical analysis. Although we can include all the columns for our analysis yet we are going to keep only three categorical variable which will be helpful for the boxplot in the data visualization section of our report.
+
+
+```{r message=FALSE, warning=FALSE, include=FALSE, paged.print=FALSE}
+
+df <- read_csv("~/Documents/R_data_Visualizations/Forbes2000.csv")
+
+df <- df %>% select(-"...1")
+
+```
+
+## Overview of the Variables
+
+Description of our example data set `Forbes2000` is given in the table below. The data set has the shape (`r dim(df)`which basically illustrates that it has 2000 rows and 8 columns. The following table also shows the variable types.
+
+| Sr. \# | Column name      | Unit           | Variable type           |
+|--------|------------------|----------------|-------------------------|
+| 1      | `r names(df[1])` | Number         | `r sapply(df[1],class)` |
+| 2      | `r names(df[2])` | \-             | `r sapply(df[2],class)` |
+| 3      | `r names(df[3])` | \-             | `r sapply(df[3],class)` |
+| 4      | `r names(df[4])` |                | `r sapply(df[4],class)` |
+| 5      | `r names(df[5])` | USD (Billions) | `r sapply(df[5],class)` |
+| 6      | `r names(df[6])` | USD (Billions) | `r sapply(df[6],class)` |
+| 7      | `r names(df[7])` | USD (Billions) | `r sapply(df[7],class)` |
+| 8      | `r names(df[8])` | USD (Billions) | `r sapply(df[8],class)` |
+
+: Description of dataset
+
+Other summary statistics about the dataset are given below 
+
+```{r echo=FALSE}
+summary(df)
+```
+
+
+### Boxplot and quartile check
+
+Boxplot is an effective way to show quartile and median. For the ease of analysis we are selecting only 3 countries and 3 categories for boxplot. The quartiles (Q1 and Q3) are shown by edges of the boxplot for each country separately.
+
+```{r box,echo=FALSE, fig.cap=("Sales evolution in 3 english Speaking countries"), message=FALSE, warning=FALSE, paged.print=FALSE}
+
+df %>%
+ filter(category %in% c("Food drink & tobacco", "Transportation", "Construction")) %>% filter(country %in% c("United States","United Kingdom", "Australia")) %>% 
+ ggboxplot(x = "category", y = "sales", color="country",palette ="country", add = "jitter") + 
+ labs(subtitle = "Sales Boxplot for 3 categories of products") +
+ ggthemes::theme_base()+ theme(legend.position = "bottom")
+
+```
+
+The boxplot in `r f.ref("one_figure")` shows that for 3 english speaking countries the mean value of sales are less than 20 billion USD while there are some spots with outliers. The outliers of sales are shown by points outside the boxplot. We conclude that for the category of Food and Drink the sales are much higher as shown by Q3 value in lowest boxpot. For the companies involved in construction the mean sales is less as compared to a company which involves Food and drink prodicts. One important observation for the above boxplots is the small value of variation of quartiles in Australia as compared to UK and USA. The underline reason behind small value of sales in all 3 categories for Australia can be represented with more analysis.
+
+### Skewness and kurtosis check
+
+The skewness and kurtosis of the dataset is shown statistically by distribution Plots. For our dataset we are selecting 3 categories as above to plot the distribution of dataset. It helps us to determine if our data is normally distributed. The `r f.ref("two_figure")` shows that the sales are normally distrbuted with a mean value around zero. It also shows that out of 3 countries selected the none of the sales group is left of right skewed. Moreover the mean value can be checked with the help of `Shapiro wilk` test.
+
+```{r echo=FALSE, fig.cap=("Normal Distrbution check of `sales`"), message=FALSE, warning=FALSE, paged.print=FALSE}
+
+df %>%
+ filter(category %in% c("Food drink & tobacco", "Transportation", "Construction")) %>%
+  filter(country %in% c("United States","United Kingdom", "Australia")) %>%
+ ggplot() +
+  aes(x = sales, fill = category) +
+  geom_density(adjust = 1L) +
+  scale_fill_hue(direction = 1) +
+  ggthemes::theme_base() +   facet_wrap(vars(country)) + theme(legend.position = "bottom")+
+  xlim(-20, 20)
+```
+
+### Shapiro Wilk Test
+
+We will select the sales group with the 3 countries to run the shapiro wilk test. Before the Shapiro test we need the define the significance level for our tests since it is very basic principle of statistical tests to check our hypothesis according to the confidence level chosen. It is very common in the scientific community to select the 95% confidence level or an alpha value of 0.05 to check if there is significant difference between mean values of two observations. We have to check if the above plotted graph actually shows the correct results that sales are normally distributed so for this purpose we will perform the shapiro wilk test. It is essential to define the null hypothesis since the output of the Shapiro wilk test provides p-value linked to acceptance or rejection of hypothesis. For the sake of simplicity we take confidence level = 95% and at the alpha value of 0.05 our hypothesis are as follows
+
+-   Null hypothesis: $H_0$ = The Sales for the 2 countries is normally distributed
+-   Alternate hypothesis: $H_1$ = The sales of the 2 countries is not normally distributed
+
+The two hypothesis will be checked with the help of p-value. If the result of Shapiro wilk test gives us p-value \< 0.05 which is less than $\alpha$ = 0.05 we will reject our null hypothesis and accept the alternate hypothesis. We will conduct the Shapiro wilk test for 2 countries separately.
+
+-   For USA
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, paged.print=FALSE}
+df %>%
+filter(country %in% c("United States")) %>% select(sales) %>%   
+  sapply(.,shapiro.test)
+
+#Step1
+install.packages("carbonate")
+# Step 2
+library(carbonate)
+
+# Step3 copy code below
+df %>%
+filter(country %in% c("United States")) %>% select(sales) %>%   
+  sapply(.,shapiro.test))
+
+# Step 4
+x <- carbon$new()
+
+# Step 5
+x$browse()
+
+
+
+```
+
+-   For UK
+
+```{r echo=FALSE}
+df %>% 
+filter(country %in% c("United Kingdom")) %>% select(sales) %>%   
+  sapply(.,shapiro.test)
+```
+
+
+We observe that the p-value in all 3 countries is less than 0.05 hence we reject our null hypothesis that the sales in 2 countries is normally distributed.
+
+Now we will the conduct the non-parametric test now since our filtered data is not normally distributed. The non-parametric test involve the Wilcoxon-rank sum test for our example since we are going to compare 2 countries for sales comparison. The other choice would have been t-test if the `sales` group had p-value \> $\alpha$ .
+
+### Wilcoxon-Rank sum test
+
+We select UK and USA for our non parametric test as in both groups the sales are independent of each other. Our assumption revolves around p-value again which in turn is linked to null and alternate hypothesis. Our two hypothesis are;
+
+-   $H_0$ : Sales in UK are equal to the sales in USA.
+-   $H_1$ : Sales in UK are not equal to USA.
+
+```{r echo=FALSE}
+wilcox <- df %>%
+filter(country %in% c("United Kingdom", "United States"))
+
+wilc <-  wilcox.test(wilcox$sales ~ wilcox$country)
+
+wilc 
+
+```
+
+The result of Wilcoxon sum test indicate that at 5% significance level p-value \> 0.05 hence there exists no statistically significant difference between the sales of UK and USA. In other words we accept our null hypothesis $H_0$ and reject alternate hypothesis $H_1$.
+
+The result of the test can be shown on boxplot
+
+```{r echo=FALSE,fig.cap=("Wilcoxon test plotting")}
+
+# plot with statistical results
+ggbetweenstats( # independent samples
+  data = wilcox,
+  x = country,
+  y = sales,
+  plot.type = "box", # for boxplot
+  type = "nonparametric", # for wilcoxon
+  centrality.plotting = FALSE # remove median
+)
+```
+
+## Corelation plot and Regression Analysis
+
+The correlation plot analyses if there is any correlation between different variables in our dataset. The figure below shows that there is high correlation between market value and sales as compared to sales and profit. Similarly the companies which have high market value are most likely to get more profits according to correlation coefficient value of 0.55. The correlation plot also shows that almost all the variables are statistically significant to each other since we have high number of stars given below according to statistical labeling technique. One more aspect in the corelation plot is the multiple regression lines given on the bottom left quarter. It shows that the variables for which there is high correlation value (such as profits and market value with correlation value of 0.64) , there is very high chance of linear incremental trend.
+
+```{r echo=FALSE, fig.cap=("Corelation plot between numeric variables")}
+df %>% select(-c("country","category","name","rank")) %>% 
+chart.Correlation(df, histogram = TRUE, method = "pearson")
+```
+
+```{r model, echo=FALSE}
+
+model <- lm(sales ~ marketvalue, data=df)
+summary(model)
+
+```
+
+The p-value for the `market value` is very less than 0.05 which indicates that it gives us a reliable guess about the sales of the company. Multiple and adjusted R-squared for us are \> 0.4 which means that `market value` can indicates 41% of sales generally.
+
+## Summary 
+
+`Forbes2000` dataset was chosen for the statistical and regression analysis for assignment. Out of many categorical and numerical variables we chose only one numerical (sales) and two categorical variables (UK and USa) for the statistical tests. It is reported by running various statistical tests that the sales is positively corelated with the market values of the companies given in the dataset. The result of shapiro wilk normality test indicates that the sales in UK, USA and Australia are not normally distributed. p-value is Wilcoxon sum test indicates that there exists significant difference between the sales of UK and USA for the companies included in `Forbes2000`. Correlation plot and Regression analysis indicates that there are many variables in the dataset which have high correlation with each other. Finally, the boxplot illustration shows that the sales in Australia are very less as compared to UK and USA. Furthermore, there are cases in all 3 countries when sales are much more than mean value as indicated by outliers on boxplot.
+
+\clearpage
+
+## Appendix
+
+```{r eval=FALSE, include=T}
+knitr::opts_chunk$set(
+  comment = "#>", echo = FALSE, out.width = "50%", out.height = "50%",fig.align="center"
+)
+```
+
+```{r eval=FALSE, message=FALSE, warning=FALSE, include=T, paged.print=FALSE}
+# Importing libraries
+library(readr)
+library(tidyverse)
+library(dplyr)
+library(stats)
+library(broom)
+library(ggplot2)
+library(ggpubr)
+library(captioner)
+library(PerformanceAnalytics)
+library(ggstatsplot)
+library(knitr)
+```
+
+```{r eval=FALSE, include=T}
+table_captions <- captioner::captioner(prefix="Tab.")
+figure_captions <- captioner::captioner(prefix="Fig.")
+
+t.ref <- function(label){
+  stringr::str_extract(table_captions(label), "[^:]*")
+}
+
+f.ref <- function(label){
+  stringr::str_extract(figure_captions(label), "[^:]*")
+}
+```
+
+```{r eval=FALSE, message=FALSE, warning=FALSE, include=T, paged.print=FALSE}
+
+df <- read_csv("~/Documents/R_data_Visualizations/Forbes2000.csv")
+
+df <- df %>% select(-"...1")
+
+```
+
+```{r eval=FALSE, include=T}
+attach(df)
+
+head(round(prop.table(table(OFFICER_YEARS_ON_FORCE,OFFICER_GENDER),1)*100))
+
+```
+
+```{r eval=FALSE, include=TRUE}
+
+df %>% group_by(OFFICER_GENDER,OFFICER_YEARS_ON_FORCE) %>% 
+  summarise(number = n()) %>%
+  pivot_wider(names_from = OFFICER_GENDER,values_from = number)
+
+```
+
+```{r box1, eval=FALSE, fig.cap=("Sales evolution in 3 english Speaking countries"), message=FALSE, warning=FALSE, include=T, paged.print=FALSE}
+
+df %>%
+ filter(category %in% c("Food drink & tobacco", "Transportation", "Construction")) %>%
+  filter(country %in% c("United States","United Kingdom", "Australia")) %>% 
+  ggboxplot(x = "category", y = "sales", color="country",palette ="country", add = "jitter") + 
+ labs(subtitle = "Sales Boxplot for 3 categories of products") +
+ ggthemes::theme_base()+ theme(legend.position = "bottom")
+
+```
+
+```{r eval=FALSE, fig.cap=("Normal Distrbution check of `sales`"), message=FALSE, warning=FALSE, include=T, paged.print=FALSE}
+
+df %>%
+ filter(category %in% c("Food drink & tobacco", "Transportation", "Construction")) %>%
+  filter(country %in% c("United States","United Kingdom", "Australia")) %>%
+  
+ ggplot() +
+  aes(x = sales, fill = category) +
+  geom_density(adjust = 1L) +
+  scale_fill_hue(direction = 1) +
+  ggthemes::theme_base() +   facet_wrap(vars(country)) + theme(legend.position = "bottom")+
+  xlim(-20, 20)
+```
+
+```{r eval=FALSE, message=FALSE, warning=FALSE, include=T, paged.print=FALSE}
+df %>%
+filter(country %in% c("United States")) %>% select(sales) %>%   
+  sapply(.,shapiro.test)
+
+```
+
+
+
+```{r eval=FALSE, include=T}
+df %>% 
+filter(country %in% c("United Kingdom")) %>% select(sales) %>%   
+  sapply(.,shapiro.test)
+```
+```{r eval=FALSE, include=T}
+wilcox <- df %>%
+filter(country %in% c("United Kingdom", "United States"))
+
+wilc <-  wilcox.test(wilcox$sales ~ wilcox$country)
+
+wilc 
+
+```
+
+
+
+```{r eval=FALSE, fig.cap=("Wilcoxon test plotting"), include=T}
+
+# plot with statistical results
+ggbetweenstats( # independent samples
+  data = wilcox,
+  x = country,
+  y = sales,
+  plot.type = "box", # for boxplot
+  type = "nonparametric", # for wilcoxon
+  centrality.plotting = FALSE # remove median
+)
+```
+
+
+
+```{r eval=FALSE, fig.cap=("Corelation plot between numeric variables"), include=T}
+df %>% select(-c("country","category","name","rank")) %>% 
+chart.Correlation(df, histogram = TRUE, method = "pearson")
+```
+
+```{r model1, eval=FALSE, include=T}
+
+model <- lm(sales ~ marketvalue, data=df)
+summary(model)
+
+```
+

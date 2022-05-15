@@ -1,0 +1,278 @@
+---
+title: "MA304 coursework"
+output: pdf_document
+geometry: margin=0.5cm
+always_allow_html: true
+---
+
+```{r include=F}
+knitr::opts_chunk$set(
+  echo=T,include=T,message = F,warning = F,fig.align="center"
+)
+```
+
+```{r echo=FALSE}
+# Importing libraries
+library(readr)
+library(tidyverse)
+library(dplyr)
+library(stats)
+library(broom)
+library(ggplot2)
+library(ggpubr)
+library(captioner)
+library(ggstatsplot)
+library(knitr)
+library(DataExplorer)
+library(shiny)
+library(tidyr)
+library(ggridges)
+library(janitor)
+library(kableExtra)
+library(DT)
+library(htmltools)
+library(plotly)
+library(dlookr)
+library(data.table)
+```
+
+```{r, echo=FALSE}
+table_captions <- captioner::captioner(prefix="Table.")
+figure_captions <- captioner::captioner(prefix="Figure.")
+
+t.ref <- function(label){
+  stringr::str_extract(table_captions(label), "[^:]*")
+}
+
+f.ref <- function(label){
+  stringr::str_extract(figure_captions(label), "[^:]*")
+}
+```
+
+# Dataset Description
+
+The dataset provided by Dallas Police department involves the details related to Subject in incidents. The injuries may happen during this course which is also reported. The other details given are Officer and subject race, gender, Officer force type etc. The basic aim of the given data is to analyse the research question if there is any Race effect on the arrests and other crime related incidents involving both parties. We will analyse this question with the help of steps below. 
+
+First of all we load the csv file and clean the column alongwith removing columns without any value. 
+```{r}
+df <- read.csv("~/Documents/R_data_Visualizations/37-00049_UOF-P_2016_prepped.csv",na.strings = c("")) %>%  clean_names() %>% remove_empty()
+```
+
+
+# Overview of data
+
+We can get an overview of the our dataset with the help of `head` function. It gives us important information about the data types of variables in the dataset which can help to determine what variables we should keep. The information from this very initial step can help for EDA analysis. 
+ 
+ref: 
+```{r head, fig.cap=("Overview of data by `head` function")}
+head(df)
+```
+
+
+`r t.ref("head")`
+# EDA Analysis
+
+EDA analysis is an important step for this assignment. We have many data types in our dataframe from characters to double. We will convert the data types to factors and numeric. It will help in data visualization. 
+
+At first we get the shape of the data set by `dim` function.
+
+```{r}
+dim(df)
+```
+
+The first row is an extra with same names as the datframe. We removed by using in code chunk below. 
+
+We also use `attach` function of base R which will help to call dataset variables without using the basic $ sign each time. 
+
+```{r, echo=FALSE}
+
+
+attach(df)
+
+df = df[-1,]
+
+```
+
+With the help of Exp Data function we can have a closer look into variables types and other important details of the dataset.
+
+
+```{r}
+library("SmartEDA")
+ExpData(data=df,type=1)
+
+```
+
+The above overview is also given below with data types in each column.
+
+```{r fig.cap=("Variable data types")}
+
+library(skimr)
+datatable(skim(df))
+```
+
+
+There are some values in the dataset which will removed periodically in data visualization instead of removing them row by row here.
+
+From the table above we conclude that almost all variables are of data type `character` which is not helpful for the data analysis via visualization such as boxplot so we will convert the character to factors and dbl to numeric in chunk below. 
+
+
+
+```{r}
+
+df <-  lapply(df, as.factor) %>% data.frame()
+
+df$officer_years_on_force <- as.numeric(as.character(df$officer_years_on_force))
+
+df$street_number <- as.numeric(as.character(df$street_number ))
+df$sector <- as.numeric(as.character(df$sector))
+
+
+```
+
+
+After getting overall view of the data let's check the measure of central tendency. It will help to determine and introduce the data statistically. 
+
+```{r}
+
+diagnose_numeric(df)
+
+```
+
+Some columns will be removed which has large number of `NaN` 
+
+```{r}
+df <- df %>% select(-c("uof_number",matches("used")))
+```
+
+
+The outliers can also eb detected with boxplots. 
+
+```{r}
+df %>% filter(subject_gender==c("Male","Female"))%>% 
+plot_boxplot(., by ="officer_gender")
+```
+
+We observe that most outliers related to male officers with several years of service. Moreover the average service of officers from both genders is less than 10 years. 
+
+
+With regards to the factor variables such as `officer_injury_type' we can have detailed description of each incident separately. At first we start with the duplicates detection. 
+```{r}
+
+p <- df %>% get_dupes(officer_injury_type)%>%  ggboxplot(x="officer_injury_type",y="dupe_count",color="officer_gender", add="jitter")+theme(axis.text.x = element_text(angle = 90, size = 5))+scale_alpha(0.5)+
+ylim(0, 100)
+ggplotly(p)
+```
+We observe that most of duplicates are the `No innjuy` for both officer genders. Similar observation can be checked for subjects which shows the similar trend althought the duplicates for abrasive injuries for subjects are higher. 
+
+```{r fig.cap=("Duplicates in the dataset for injury type")}
+
+p <- df %>% get_dupes(subject_injury_type)%>% filter(subject_gender!=c(NULL,"Unknown")) %>%  ggboxplot(x="subject_injury_type",y="dupe_count",color="subject_gender", add="jitter")+theme(axis.text.x = element_text(angle = 90, size = 5))+ylim(0, 100)
+
+ggplotly(p)
+```
+
+We can find the number of incidents for time period of each race separately by using `tabyl` function. 
+
+```{r}
+datatable(tabyl(df,incident_time,subject_race) %>%  select(-NULL))
+```
+
+We observe that most incidents are occurring late night and in the morning around 9AM. 
+
+Furthermore we can find a summary statistics of categorical variables. We can run several test on the input categorical variables such as `chi-square` test. The p-value which is basically a statistical check to analyse if there exist significant difference between variables at commonly chosen 5% significance level. 
+
+The table generated from the  code chunks gives us many insights into the dataset. None of the variables is predictive enough to give us major result about dataset as shown in last column. Althought the p-values are less than 0.05 yet the degree of association is very weak between categorical variables in our dataset as shown by result of chi-square test. 
+
+```{r}
+p <-  datatable(ExpCatStat(df,Target="subject_race",result = "Stat",clim=10,nlim=5,Pclass="Yes"))
+
+p
+
+
+```
+
+Graphical representation for categorical varaibles in given below. 
+
+
+```{r }
+ExpCatViz(df,target="officer_race",fname=NULL,clim=10,col=NULL,margin=2,Page = c(2,1),sample=2)
+
+
+```
+
+```{r}
+ExpCatViz(df,target="subject_injury",fname=NULL,clim=10,col=NULL,margin=2,Page = c(2,1),sample=2)
+
+
+```
+Above 2 figures show that the percentage of officer getting injury during incidents are high as they are in large percentage in total count of officers. The percentage of injury hispanic officers is almost equal at 19% and 20%. On the other hand there 15% chance of asian officers not able to arrest the subject. Officers are also most likely to be hospitalized alongwith subjects in the incidents involving unfavorable conditions. 
+
+
+We can find the correlation between variables as well which gives results in the form of correlation coefficent. The results show that none of numeric variables are strongly correlated with each other.  
+
+```{r}
+correlate(df)
+```
+
+The above tabular corelation data can be shown in graphical form.
+```{r}
+ df %>% 
+  correlate() %>%
+  plot()
+
+
+```
+
+
+The skewness check of numeric variables is given below. 
+```{r}
+find_skewness(df)
+find_skewness(df, index = FALSE)
+
+find_skewness(df, value = TRUE)
+```
+
+So the major numeric variables of on duty years is skewed which need to analysed to remove skewness. Other 2 variables can be reject for skewnss removal since they do not weigh much in the analysis.
+
+
+Following graphs shows that the officers with more service years are used for crowd control in the department. Furthermore there is very high chance of use of force when subject has weapons. Senior officers will go for severe levels of use of force when the subject is black as shown in boxplot with green fill. 
+```{r}
+
+
+p <- df %>%
+ filter(!(subject_race %in% "NULL")) %>%
+ filter(!(reason_for_force %in% "NULL")) %>%
+ ggplot() +
+ aes(x = officer_years_on_force, y = reason_for_force, fill = subject_race) +
+ geom_boxplot() +
+ scale_fill_hue(direction = 1) +
+ ggthemes::theme_base()+theme(legend.position = "bottom")
+
+ggplotly(p)
+
+```
+
+The chart given below shows that males subjects mostly undergo use of force during arrest as compared to their counterparts. Similar trend is observed for for almost all cases of use of force with more proportion towards males class. 
+```{r}
+
+
+df1 <- df %>% select(subject_gender,reason_for_force,officer_gender)
+
+p <- df1 %>%
+ filter(subject_gender %in% c("Female", "Male")) %>%
+ filter(!(reason_for_force %in% "NULL")) %>%
+ ggplot() +
+  aes(x = reason_for_force, fill = subject_gender) +
+  geom_bar(position = "dodge") +
+  scale_fill_hue(direction = 1) +
+  coord_flip() +
+  theme_minimal()
+
+ggplotly(p)
+```
+
+# Summary 
+
+Data Analysis is conducted for the Dallas, USA Police enquity dataset in view of the racial recognition effects. The analysis shows that major portion of both classes of officer genders can go uninjured during incidents while this is not the case of subjects. Black race subjects are involved in high percentage in the incidents followed by hispanics. Statistical analysis of categorical varaibles show that there is variable which can serve as predictve variable. Similarly, the male officers, which consist of more 70% of officers in service, can have skewness in their data on the basis of service years. Normality of dataset was checked which gave us a p-value < 0.05 at 95% confidence level. The corelation matrix shows that none of numeric variables is correlated to each other. The statistical tables show that asian officers have less chance of completing arrests in incidents as compared to white police officers. 
+
+

@@ -1,0 +1,3 @@
+"0","df1 <-  Q2.df %>% select(2,4,6,8,10) "
+"0",""
+"0","shapiro_test(df1$AvgGrade2001,df1$AvgGrade2002,df1$AvgGrade2003,df1$AvgGrade2004,df1$AvgGrade2005)"

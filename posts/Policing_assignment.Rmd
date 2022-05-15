@@ -1,0 +1,411 @@
+---
+title: "MA304 coursework"
+#output: 
+#   pdf_document:
+#   fontsize: 11pt
+#   geometry: margin=0.5in
+#   pandoc_args: --listings
+#   includes:
+#       in_header: preamble.tex
+# always_allow_html: true
+
+output:
+  html_document:
+    toc: true
+    toc_float: True
+    collapsed: False
+    smooth_scroll: True
+    theme:
+      version: 4
+      bootswatch: sandstone
+---
+
+
+```{r include=F}
+knitr::opts_chunk$set(
+  echo=T,include=T,message = F,warning = F,fig.align="center",fig.align='center',fig.width=10,fig.height=8,out.extra = "20%"
+) 
+```
+
+```{r echo=FALSE}
+# Importing libraries
+library(readr)
+library(tidyverse)
+library(dplyr)
+library(stats)
+library(broom)
+library(ggplot2)
+library(ggpubr)
+library(captioner)
+library(PerformanceAnalytics)
+library(ggstatsplot)
+library(knitr)
+library(DataExplorer)
+library(ggmap)
+library(shiny)
+library(lubridate)
+library(gridExtra)
+library(tidyr)
+library(ggridges)
+library(janitor)
+library(kableExtra)
+library(DT)
+library(htmltools)
+library(plotly)
+library(dlookr)
+library(data.table)
+```
+
+```{r, echo=FALSE}
+table_captions <- captioner::captioner(prefix="Tab.")
+figure_captions <- captioner::captioner(prefix="Fig.")
+
+t.ref <- function(label){
+  stringr::str_extract(table_captions(label), "[^:]*")
+}
+
+f.ref <- function(label){
+  stringr::str_extract(figure_captions(label), "[^:]*")
+}
+```
+
+
+# Dataset Description
+
+How the justice is related to race? Does the police officer behaviour leads to the injuries? Is the racism a premium factor in the crime incidents?
+These questions alongwith many other queries are needed to be answered from the dataset provided. It has many details related to officer, injuries, incident location, injuries caused, time and date of incident etc. We will discuss the multiple variables in the dataset to make a concise analysis to answer the questions mentioned above. 
+
+# Overview of data
+
+We can get an overview of the our dataset with the help of `head` function. It gives us important information about the data types of variables in the dataset which can help to determine what variables we should keep. The information from this very initial step can help for EDA analysis. 
+```{r}
+df <- read.csv("~/Documents/R_data_Visualizations/37-00049_UOF-P_2016_prepped.csv",na.strings = c(""))
+```
+ 
+
+```{r}
+datatable(df)
+```
+
+# EDA Analysis
+
+* Step1: Getting shape of dataset
+
+```{r}
+dim(df)
+```
+
+
+* Step2: Removing extra column
+
+
+This step involves several step from getting duplicates in the data to the actual check of normalization of the data. In the 1st step we will remove the 1st column since it has already same variable names as the 1st row. 
+
+```{r, echo=FALSE}
+
+
+attach(df)
+
+df = df[-1,]
+
+```
+
+* Step3: Converting variable types
+
+We observe there are `character` variables which can converted to factors and `double` variables which can be converted to numeric for plotting so we use the R package named `commonutiladdins` to convert them to desired data type. After converting the result is given as 
+
+```{r}
+
+df <-  lapply(df, as.factor) %>% data.frame()
+
+df$OFFICER_YEARS_ON_FORCE <- as.numeric(as.character(df$OFFICER_YEARS_ON_FORCE))
+
+df$STREET_NUMBER <- as.numeric(as.character(df$OFFICER_YEARS_ON_FORCE))
+df$SECTOR <- as.numeric(as.character(df$SECTOR))
+df$LOCATION_LATITUDE <- as.numeric(as.character(df$LOCATION_LATITUDE))
+df$LOCATION_LONGITUDE <- as.numeric(as.character(df$LOCATION_LONGITUDE))
+
+
+```
+
+
+```{r}
+datatable(diagnose(df))
+```
+From the above we can notice that there are columns with lots of missing values we can remove them with the help of code below
+
+* Step4: Removing columns with `Nan` values
+ 
+```{r}
+df <-  df %>% select(!matches("USED"))%>%
+  select(-c(LOCATION_CITY,LOCATION_STATE,NUMBER_EC_CYCLES, OFFICER_ID, SUBJECT_ID,BEAT, UOF_NUMBER)) 
+```
+ 
+ 
+* Step5: Converting data time format to separate columns
+
+Before the data visualization and normality check, we observe there are variables with date format so we will use `stringr` package to mutate new columns with separate day, date and hour for incidents. It will help us to analyse the data further in data visualization section. 
+
+
+```{r}
+df$INCIDENT_DATE <- as.Date(df$INCIDENT_DATE, format = "%m/%d/%Y")
+df$INCIDENT_DATE <- gsub("00","20",df$INCIDENT_DATE)
+df$INCIDENT_DATE <- as.Date(df$INCIDENT_DATE, format = "%Y-%m-%d")
+df$INCIDENT_TIME <- format(strptime(df$INCIDENT_TIME, "%I:%M:%S %p"), "%H:%M:%S")
+df$INCIDENT_MONTH <- months(as.Date(df$INCIDENT_DATE))
+df$INC_MONTH <-format(df$INCIDENT_DATE,"%m")
+df$INCIDENT_HOUR <- as.numeric(substr(df$INCIDENT_TIME, 0, 2))
+df$INCIDENT_DAY <- wday(df$INCIDENT_DATE)
+df$INC_HOUR <- substr(df$INCIDENT_TIME, 0, 2)
+df$INC_DATE <- substr(df$INCIDENT_DATE, 9, 10)
+
+## Create group of datas:
+
+df_year <-  df %>%
+  group_by(INCIDENT_DATE,INCIDENT_MONTH,INCIDENT_DAY) %>%
+  summarize(count = n())
+
+df_month <-  df %>%
+  group_by(INC_MONTH) %>%
+  summarize(count = n())
+
+df_day <-  df %>%
+  group_by(INCIDENT_DAY,INCIDENT_HOUR) %>%
+  summarize(count = n())
+
+df$INC_HOUR <- substr(df$INCIDENT_TIME, 0, 2)
+
+df   %>% group_by(INC_HOUR) %>%
+  summarize(avg =n()) -> df_hour_n
+
+
+```
+
+* Step6: Central tendency check
+
+For the EDA analysis we have used the package `dlookr` and `Dataexplorer` of R. Following table provides us the information about the central tendency of our dataset. 
+```{r}
+diagnose_numeric(df)
+```
+
+
+We can check the outliers of the dataset with the help of boxplots for numeric variables. 
+```{r}
+df %>%
+  plot_outlier(diagnose_outlier(df) %>% 
+                 filter(outliers_ratio >= 0.5) %>% 
+                 select(variables) %>% 
+                 unlist())
+```
+
+* Step7: Corelation plot
+
+The corelation map given above can be extracted in a tabular form
+
+```{r}
+correlate(df)
+```
+
+```{r}
+df %>% 
+  correlate() %>%
+  plot()
+```
+
+
+* Step 8: Normality check 
+We can check the normality of our dataset which will help us to reject or accept our null hypothesis which is given individually for each numeric variable. For instance, for the variable `r df$OFFICER_YEARS_ON_FORCE` we make a null hypothesis that it is not normal. If we get p-value < 0.05 we can reject our null hypothesis at 5% siginificance level. 
+
+```{r}
+normality(df)
+```
+The p-value for all the numeric variables is less than 0.05 at significance level of 5% so we consider that our data is normal after the steps given above. 
+
+
+* Step 10: Skewness check 
+
+We have not included the skewness plots in our dataset till now which is given below with a code snippet. 
+
+```{r}
+find_skewness(df)
+find_skewness(df, index = FALSE)
+
+find_skewness(df, value = TRUE)
+```
+
+
+So the major numeric variables of on duty years is skewed which need to analysed to remove skewness. Other 2 variables can be reject for skewnss removal since they do not weigh much in the analysis. 
+
+We can remove the skewness by 
+
+```{r}
+OFFICER_YEARS_ON_FORCE = transform(df$OFFICER_YEARS_ON_FORCE, method = "log")
+
+summary(OFFICER_YEARS_ON_FORCE)
+```
+
+
+plotting the variables after skewness removal 
+
+
+```{r}
+plot(OFFICER_YEARS_ON_FORCE)
+
+```
+
+Alongwith with individual steps described above we can create an automatic EDA report from the data. 
+```{r warning=FALSE,message=FALSE,include=FALSE}
+
+df %>%
+  eda_web_report(subtitle = "Racism effect in Dallas Police enquity",
+                            output_dir = "./", output_file = "report.html", 
+                            theme = "blue")
+
+htmltools::includeHTML("report.html")
+
+```
+
+
+
+# Data Visualizations
+
+The data visualization are greatly helpful for insights into the data. Following graphs will explain mainly the subject characteristics to the other parameters. We will explain each graph in a short sentences before each graph. 
+
+
+The below figure shows that the incidents were greatly reduced in the mornings hours. 
+```{r fig.cap=("Incidents frequency at different hours")}
+
+
+p <- df_day %>%
+ filter(!is.na(INCIDENT_HOUR)) %>%
+ ggplot() +
+ aes(x = INCIDENT_HOUR, y = count, size = count) +
+ geom_point(shape = "circle open", 
+ colour = "#B22222") +
+ geom_smooth(span = 0.75) +
+ ggthemes::theme_base()
+
+
+ggplotly(p)
+```
+
+Following violin plots show that the incidents are greatly reducted in the month of feb as compared to other months. Moreover the variations from the mean can be greatly observed in the winter months. 
+```{r}
+ggplot(df_year) +
+ aes(x = count, y = INCIDENT_MONTH, fill = INCIDENT_MONTH) +
+ geom_violin(adjust = 1L, 
+ scale = "area") +
+ scale_fill_hue(direction = 1) +
+ theme_minimal()
+
+
+```
+
+Following graph describes the fact that Black Males are most likely to be involved in incidents. 
+```{r}
+
+p <- df %>%
+ filter(!(SUBJECT_RACE %in% "NULL")) %>%
+ filter(SUBJECT_GENDER %in% c("Female", "Male")) %>%
+ filter(!(INCIDENT_REASON %in% 
+ "NULL")) %>%
+ filter(!(REASON_FOR_FORCE %in% "NULL")) %>%
+ filter(!is.na(INCIDENT_HOUR)) %>%
+ filter(!is.na(INC_HOUR)) %>%
+ ggplot() +
+ aes(x = SUBJECT_RACE, fill = SUBJECT_RACE) +
+ geom_bar() +
+ scale_fill_hue(direction = 1) +
+ ggthemes::theme_base() +
+ theme(legend.position = "bottom") +
+ facet_wrap(vars(SUBJECT_GENDER), ncol = 2L)+theme(axis.text.x = element_text(angle=45, vjust=2, hjust=1))
+
+ggplotly(p)
+```
+
+
+Whenever there is chance of Arrest, the police officer will most likely use force as shown in graph below. 
+```{r}
+p <- df %>%
+ filter(!(SUBJECT_RACE %in% "NULL")) %>%
+ filter(SUBJECT_GENDER %in% c("Female", "Male")) %>%
+ filter(!(INCIDENT_REASON %in% 
+ "NULL")) %>%
+ filter(!(REASON_FOR_FORCE %in% "NULL")) %>%
+ filter(!is.na(INCIDENT_HOUR)) %>%
+ filter(!is.na(INC_HOUR)) %>%
+ ggplot() +
+ aes(x = REASON_FOR_FORCE, fill = SUBJECT_GENDER, weight = OFFICER_YEARS_ON_FORCE) +
+ geom_bar() +
+ scale_fill_hue(direction = 1) +
+ ggthemes::theme_few() +
+ theme(legend.position = "bottom") +
+ facet_wrap(vars(OFFICER_INJURY), 
+ scales = "free", ncol = 1L)+theme(axis.text.x = element_text(angle=45, vjust=2, hjust=1))
+
+ggplotly(p)
+```
+
+Both the young officers and old officers will undergo injury during incidents. 
+```{r}
+
+p <- df %>%
+ filter(!(SUBJECT_RACE %in% "NULL")) %>%
+ filter(SUBJECT_GENDER %in% c("Female", "Male")) %>%
+ filter(!(INCIDENT_REASON %in% 
+ "NULL")) %>%
+ filter(!(REASON_FOR_FORCE %in% "NULL")) %>%
+ filter(!is.na(INCIDENT_HOUR)) %>%
+ filter(!is.na(INC_HOUR)) %>%
+ ggplot() +
+ aes(x = OFFICER_YEARS_ON_FORCE, fill = OFFICER_INJURY, weight = OFFICER_YEARS_ON_FORCE) +
+ geom_density(adjust = 1L) +
+ scale_fill_hue(direction = 1) +
+ ggthemes::theme_base() +
+ theme(legend.position = "bottom")
+
+ggplotly(p)
+```
+
+The below graph show that there is no clear corelation between officer race and subject race during incidents. It can be equal for all cases although ratio of males is much higher to be involved in incidents. 
+```{r}
+p <- df %>%
+ filter(!(SUBJECT_RACE %in% "NULL")) %>%
+ filter(SUBJECT_GENDER %in% c("Female", "Male")) %>%
+ filter(!(INCIDENT_REASON %in% 
+ "NULL")) %>%
+ filter(!(REASON_FOR_FORCE %in% "NULL")) %>%
+ filter(!is.na(INCIDENT_HOUR)) %>%
+ filter(!is.na(INC_HOUR)) %>%
+ ggplot() +
+ aes(x = SUBJECT_RACE, y = OFFICER_RACE, fill = OFFICER_GENDER) +
+ geom_tile(size = 0.5) +
+ scale_fill_hue(direction = 1) +
+ ggthemes::theme_base() +
+ theme(legend.position = "bottom")+theme(axis.text.x = element_text(angle=45, vjust=2, hjust=1))
+
+ggplotly(p)
+
+```
+
+We can check from the below graph that if the injury caused to the officer is related to the subject arrest. It was considered as a hypothesis that injury caused to the officer by subject in incident may lead to arrest and this hypothesis seems clealy rejected. 
+```{r fig.align='center',fig.width=10,fig.height=10}
+
+
+p <- ggplot(df) +
+ aes(x = SUBJECT_WAS_ARRESTED) +
+ geom_bar(fill = "#112446") +
+ labs(title = "Officer injury relation with the Subject arrest") +
+ ggthemes::theme_base() +
+ facet_wrap(vars(OFFICER_INJURY))
+
+ggplotly(p)
+```
+
+# Summary 
+
+Data Analysis has been conducted for the Dallas, USA Police enquity dataset. Several EDA steps are conducted to clean the data which was verified in the normality and skewness tests. Afterwards the data visualization show that Black males are mostly to be involved in incidents as compared to Hispanics and White males. The number of asians in incidents are on 2nd rank. The Gender of officers will most likely to have no effect on the arrests. Similar trend is found for the race of officer in relation to race of subject. 
+
+
+
+

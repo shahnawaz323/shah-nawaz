@@ -1,0 +1,1 @@
+"0","df1 <- Q2.df %>% select(3,4) %>% filter(City2002 %in% c(""Canberra""))"

@@ -1,0 +1,4 @@
+"0","plot(x='Cholesterol50',y='Cholesterol52',type='l')
+"
+"2","Error in plot.window(...) : need finite 'xlim' values
+"

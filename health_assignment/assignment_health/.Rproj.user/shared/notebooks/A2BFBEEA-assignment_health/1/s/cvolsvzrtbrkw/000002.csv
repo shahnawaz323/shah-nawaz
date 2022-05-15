@@ -1,0 +1,4 @@
+"0",""
+"0","df1 <- Q1.df %>% select(ExerciseFeb,WeightFeb)"
+"0","df1 <- df1[sample(1:nrow(df1), size=10, replace=F), ]"
+"0",""

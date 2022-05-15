@@ -1,0 +1,8 @@
+"0","# recreate the dataset without removing the NA's"
+"0","new_who = who %>% "
+"0","  pivot_longer(cols = new_sp_m014:newrel_f65, names_to = ""key"", values_to = ""cases"") %>% "
+"0","  mutate(key = str_replace(key, ""newrel"", ""new_rel"")) %>% "
+"0","  tidyr::separate(col = key, into = c(""new"", ""type"", ""sexage""), sep = ""_"") %>% "
+"0","  select(-c(iso2, iso3, new)) %>% "
+"0","  tidyr::separate(col = sexage, into = c(""sex"", ""age""), sep = 1)"
+"0","new_who"

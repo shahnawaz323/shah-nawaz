@@ -1,0 +1,21 @@
+# Using case_when function 
+
+* To add new column Material based on the string in column V1.
+
+In the following I am creating a column `Material` in the dataframe `data` which consists the value "Sand" when the values in column `V1` are equal to "Sand_ohio"
+
+```{r}
+
+data$Material<- sapply(data$V1,switch,"Sand_ohio"="Sand")
+
+```
+
+* To add a column by detecting partial string in another column 
+
+The following code will add `Sand` in the new column `Material` when the string in column `V1` has word "sand" in it. The word "sand" in column `V1` may contain other characters. If it will not contain word "sand", the word "Glass beads" will be added in the column `Material`. 
+
+
+```{r}
+data %>% mutate(Material = pmap_chr(select(., contains("V1")), ~ case_when(any(str_detect(c(...), "(?i)sand")) ~"Sand", TRUE ~ "Glass beads")))
+
+```

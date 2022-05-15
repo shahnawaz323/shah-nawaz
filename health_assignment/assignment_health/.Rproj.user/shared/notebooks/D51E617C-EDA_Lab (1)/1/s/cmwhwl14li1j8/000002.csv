@@ -1,0 +1,5 @@
+"0","# Count the number of missing values per year"
+"0","new_who %>% "
+"0","  group_by(year) %>% "
+"0","  summarise(na_count = sum(is.na(cases))) %>% "
+"0","  arrange(na_count)"

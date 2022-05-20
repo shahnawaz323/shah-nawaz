@@ -5,3 +5,37 @@ date: Sep 14 2021
 ---
 
 Shah Nawaz
+
+```{r}
+p <- df %>%
+ filter(!(SUBJECT_RACE %in% "NULL")) %>%
+ filter(SUBJECT_GENDER %in% c("Female", "Male")) %>%
+ filter(!(INCIDENT_REASON %in% 
+ "NULL")) %>%
+ filter(!(REASON_FOR_FORCE %in% "NULL")) %>%
+ filter(!is.na(INCIDENT_HOUR)) %>%
+ filter(!is.na(INC_HOUR)) %>%
+ ggplot() +
+ aes(x = SUBJECT_RACE, y = OFFICER_RACE, fill = OFFICER_GENDER) +
+ geom_tile(size = 0.5) +
+ scale_fill_hue(direction = 1) +
+ ggthemes::theme_base() +
+ theme(legend.position = "bottom")+theme(axis.text.x = element_text(angle=45, vjust=2, hjust=1))
+ggplotly(p)
+```
+
+We can check from the below graph that if the injury caused to the officer is related to the subject arrest. It was considered as a hypothesis that injury caused to the officer by subject in incident may lead to arrest and this hypothesis seems clealy rejected. 
+```{r fig.align='center',fig.width=10,fig.height=10}
+p <- ggplot(df) +
+ aes(x = SUBJECT_WAS_ARRESTED) +
+ geom_bar(fill = "#112446") +
+ labs(title = "Officer injury relation with the Subject arrest") +
+ ggthemes::theme_base() +
+ facet_wrap(vars(OFFICER_INJURY))
+ggplotly(p)
+```
+
+# Summary 
+
+Data Analysis has been conducted for the Dallas, USA Police enquity dataset. Several EDA steps are conducted to clean the data which was verified in the normality and skewness tests. Afterwards the data visualization show that Black males are mostly to be involved in incidents as compared to Hispanics and White males. The number of asians in incidents are on 2nd rank. The Gender of officers will most likely to have no effect on the arrests. Similar trend is found for the race of officer in relation to race of subject. 
+
